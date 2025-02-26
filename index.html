@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="Deformable Neural Radiance Fields creates free-viewpoint portraits (nerfies) from casually captured videos.">
+  <meta name="keywords" content="Jailbreak, LLM, Foot-In-The-Door">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Foot-In-The-Door: A Multi-turnJailbreak for LLMs</title>
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script async src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: auto;
+      min-height: 100%;
+    }
+    
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.3;
+      padding: 5px;
+      transform-origin: top left;
+      transform: scale(0.85);
+      width: 118%;
+    }
+    
+    .container {
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    
+    .title {
+      text-align: center;
+      margin: 0 0 10px 0;
+      color: #333;
+      font-size: 1.5em;
+    }
+    
+    .table-container {
+      overflow: visible;
+    }
+    
+    .table-caption {
+      font-weight: bold;
+      margin-bottom: 5px;
+      text-align: center;
+      font-size: 0.9em;
+    }
+    
+    .dnerf {
+      color: #ff5722;
+      font-style: italic;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+      font-size: 0.85em;
+      table-layout: fixed;
+      white-space: nowrap;
+    }
+    
+    th, td {
+      border: 1px solid #ddd;
+      padding: 4px 2px;
+      text-align: center !important;
+      overflow: visible;
+      vertical-align: middle;
+    }
+    
+    th:first-child {
+      width: 13%;
+    }
+    
+    th:nth-child(2) {
+      width: 13%;
+    }
+    
+    th:last-child {
+      width: 8%;
+    }
+    
+    th {
+      background-color: #f2f2f2;
+      font-weight: bold;
+    }
+    
+    thead th {
+      font-size: 0.8em;
+    }
+    
+    thead tr:nth-child(2) th {
+      font-size: 0.7em;
+    }
+    
+    .highlight-row {
+      background-color: #fff8e1;
+    }
+    
+    .highlight-row td {
+      font-weight: bold;
+    }
+    
+    .table-description {
+      font-size: 0.8em;
+      color: #555;
+      line-height: 1.3;
+      margin-top: 5px;
+      text-align: center;
+    }
+    
+    strong {
+      font-weight: bold;
+    }
+    
+    /* 修复页面底部的额外空白 */
+    section {
+      padding: 20px 0;
+    }
+    
+    footer.footer {
+      margin-top: 20px;
+      padding: 15px 0;
+      background-color: #f5f5f5;
+    }
+    
+    .footer .container {
+      padding-bottom: 0;
+    }
+    
+    #BibTeX {
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+  </style>
+   <!-- 下面是折叠的内容 -->
+  <style>
+    /* 默认收拢状态 */
+    .expandable {
+      max-height: 0;  /* 确保内容初始不可见 */
+      overflow: hidden;
+      transition: max-height 0.4s ease-in-out, padding 0.4s ease-in-out;
+      padding: 0 15px; /* 初始状态去除内边距，防止占位 */
+    }
+
+    /* 鼠标悬停时展开 */
+    .experiment-card:hover .expandable {
+      max-height: 800px; /* 设定足够大的高度，确保完整展开 */
+      padding: 15px; /* 让内边距恢复，避免视觉突兀 */
+    }
+
+    /* 卡片样式 */
+    .experiment-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease-in-out;
+      padding: 15px;
+      cursor: pointer;
+      margin: 20px auto;
+      max-width: 800px;
+    }
+
+    /* 头部标题样式 */
+    .experiment-header {
+      background-color: #87CEFA;
+      color: white;
+      padding: 15px;
+      font-weight: bold;
+      text-align: center;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+
+    /* 表格区域 */
+    .experiment-table {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    /* 表格样式 */
+    .experiment-table table {
+      border-collapse: collapse;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* 表格单元格 */
+    .experiment-table th, .experiment-table td {
+      border: 1px solid black;
+      padding: 10px;
+    }
+
+    /* 表头背景色 */
+    .experiment-table th {
+      background-color: #f2f2f2;
+    }
+  </style>
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-PYVRSFMDRL"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'G-PYVRSFMDRL');
+  </script>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" href="./static/images/FITD_v3.svg">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+<body>
+
+<nav class="navbar" role="navigation" aria-label="main navigation">
+  <div class="navbar-brand">
+    <a role="button" class="navbar-burger" aria-label="menu" aria-expanded="false">
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+      <span aria-hidden="true"></span>
+    </a>
+  </div>
+</nav>
+
+
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <!-- <h1 class="title is-1 publication-title">Foot-In-The-Door: A Multi-turnJailbreak for LLMs</h1> -->
+          <h1 class="title is-1 publication-title">
+            <img src="./static/images/FITD_v3_1.jpg" alt="Logo_v3" class="title-logo">
+            Foot-In-The-Door: A Multi-turn Jailbreak for LLMs
+          </h1>
+        
+        
+          <!-- <div class="is-size-5 publication-authors" style="display: flex; justify-content: center; gap: 50px; font-weight: bold;">
+            <span class="author-block">Zixuan Weng</span>
+            <span class="author-block">Xiaolong Jin</span>
+            <span class="author-block">Jinyuan Jia</span>
+            <span class="author-block">Xiangyu Zhang</span>
+          </div> -->
+          <div class="publication-authors">
+            <a href="https://github.com/YukinoAsuna" class="author-name">Zixuan Weng<sup style="font-size:70%;vertical-align:super">*,<span style="color:#9932CC">1</span></sup></a><span class="author-separator">,</span>
+            <a href="https://github.com/Jinxiaolong1129" class="author-name">Xiaolong Jin<sup style="font-size:70%;vertical-align:super">*,<span style="color:#32CD32">2</span></sup></a><span class="author-separator">,</span>
+            <a href="https://jinyuan-jia.github.io/" class="author-name">Jinyuan Jia<sup style="font-size:70%;vertical-align:super"><span style="color:#9932CC">1</span></sup></a><span class="author-separator">,</span>
+            <a href="https://www.cs.purdue.edu/homes/xyzhang/" class="author-name">Xiangyu Zhang<sup style="font-size:70%;vertical-align:super"><span style="color:#32CD32">2</span></sup></a>
+          </div>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><sup style="font-size:70%;vertical-align:super;color:#9932CC">1</sup>Pennsylvania State University,</span>
+            <span class="author-block"><sup style="font-size:70%;vertical-align:super;color:#32CD32">2</sup>Purdue University</span>
+          </div>
+          <div style="text-align: center; font-style: italic; margin-top: 10px; font-size: 0.9rem;">
+            (* Equal contribution)
+          </div>
+          
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <!-- PDF Link. -->
+              <span class="link-block">
+                <a href="https://arxiv.org/pdf/2011.12948"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <!-- Code Link. -->
+              <span class="link-block">
+                <a href="https://github.com/google/nerfies"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>Code</span>
+                  </a>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body has-text-centered">
+      <!-- 嵌入 jpg 图片 -->
+      <!-- <img src="./static/images/intro_v2.jpg" alt="Introduction image" style="max-width: 80%; border: 1px solid #ddd; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);"/> -->
+      <img src="./static/images/intro.jpg"
+                 class="interpolation-image"
+                 alt="Introduction image."/>
+      <h2 class="subtitle has-text-centered">
+        <!-- <span class="dnerf">An example of FITD about hacking into an email account compared to a direct query. It bypasses alignment as the malicious intent escalates over multiple interactions.</span> -->
+        An example of <strong><span class="dnerf">FITD</span></strong> about hacking into an email account compared to a direct query. It bypasses alignment as the malicious intent escalates over multiple interactions.
+      </h2>
+    </div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Ensuring AI safety is crucial as large language models become increasingly integrated into real-world applications. 
+            A key challenge is jailbreak, where adversarial prompts bypass built-in safeguards to elicit harmful disallowed outputs.
+        </p>
+        <p>
+            Inspired by psychological foot-in-the-door principles, we introduce <strong><span class="dnerf">FITD</span></strong>, 
+            a novel multi-turn jailbreak method that leverages the phenomenon where minor initial commitments 
+            lower resistance to more significant or more unethical transgressions.
+            Our approach progressively escalates the malicious intent of user queries through intermediate bridge prompts 
+            and aligns the model's response by itself to induce toxic responses.
+        </p>
+        <p>
+            Extensive experimental results on two jailbreak benchmarks demonstrate that <strong><span class="dnerf">FITD</span></strong> 
+            achieves an average attack success rate of 94% across seven widely used models, 
+            outperforming existing state-of-the-art methods.
+            Additionally, we provide an in-depth analysis of LLM self-corruption, highlighting vulnerabilities in 
+            current alignment strategies and emphasizing the risks inherent in multi-turn interactions.
+        </p>
+        
+        </div>
+      </div>
+    </div>
+    <!--/ Abstract. -->
+
+    <!-- Paper video. -->
+    <!-- <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Video</h2>
+        <div class="publication-video">
+          <iframe src="https://www.youtube.com/embed/MrKrnHhk8IA?rel=0&amp;showinfo=0"
+                  frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+        </div>
+      </div>
+    </div> -->
+    <!--/ Paper video. -->
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-3">FITD: Foot-In-The-Door Multi-turn Jailbreak Method</h2>
+        <div class="content has-text-justified">
+          
+          <!-- <img src="./static/images/main.jpg"
+          alt="Introduction image."/> -->
+          <!-- <div style="text-align: center;">
+            <img src="./static/images/main.jpg" 
+            alt="FITD image." 
+            style="width: 125%; max-width: 2000px; height: auto;"/>
+          </div> -->
+          <div style="width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center;">
+            <img src="./static/images/main.jpg" 
+                 alt="FITD image."
+                 style="width: 100%; max-width: 3000px; height: auto; object-fit: contain;">
+          </div>          
+          
+          
+          
+          <!-- <p class="subtitle has-text-centered" style="font-size: 1.2rem; line-height: 1.5;">
+            Overview of <span class="dnerf" style="font-size: 1.1rem;">FITD</span>.
+            The attack begins by generating Level \( 1 \) to Level \( n \) queries by an assistant model. 
+            Through multi-turn interactions, self-corruption is enhanced via 
+            <span class="module" style="font-size: 1.1rem; font-weight: bold;">SSParaphrase</span> 
+            and <span class="module" style="font-size: 1.1rem; font-weight: bold;">Re-Align</span>, 
+            ensuring the attack remains effective.
+          
+            <span class="module" style="font-size: 1.1rem;">SSParaphrase (SlipperySlopeParaphrase)</span> 
+            refines queries by generating intermediate malicious-level queries 
+            \( q_{\text{mid}} \) between \( q_{\text{last}} \) and \( q_i \).
+          
+            <span class="module" style="font-size: 1.1rem;">Re-Align</span> uses prompt 
+            \( p_{\text{align}} \) to align the target model's responses \( r_{\text{align}} \).
+          </p> -->
+          <p class="subtitle has-text-centered" style="font-size: 1rem; line-height: 1.4; margin-bottom: 40px;">
+            Overview of <strong><span class="dnerf" style="font-size: 0.9rem;">FITD</span></strong>.
+            The attack begins by generating Level \( 1 \) to Level \( n \) queries by an assistant model. 
+            Through multi-turn interactions, self-corruption is enhanced via 
+            <span class="module" style="font-size: 0.9rem; font-weight: bold;">Re-Align</span>
+            and <span class="module" style="font-size: 0.9rem; font-weight: bold;">SSParaphrase</span>, 
+            ensuring the attack remains effective.
+            
+            <span class="module" style="font-size: 0.9rem;">Re-Align</span> uses prompt 
+            \( p_{\text{align}} \) to align the target model's responses \( r_{\text{align}} \).
+
+            <span class="module" style="font-size: 0.9rem;">SSParaphrase (SlipperySlopeParaphrase)</span> 
+            refines queries by generating intermediate malicious-level queries 
+            \( q_{\text{mid}} \) between \( q_{\text{last}} \) and \( q_i \).
+            
+          </p>
+          
+          <h3 class="title is-4">Inspiration from Psychology: The Foot-in-the-Door Phenomenon</h3>
+          <div class="content has-text-justified">
+            <p>
+              Our method <strong><span class="dnerf">FITD</span></strong> draws inspiration from the "foot-in-the-door" phenomenon in psychology. 
+              According to this principle, once individuals perform or agree to a minor (often unethical) act, they are more likely to proceed with more 
+              significant or harmful acts afterward. 
+              For example, in a classic study, participants who first displayed a small sign supporting safe driving were subsequently much 
+              more inclined to install a much larger, more obtrusive sign. This gradual escalation of compliance, 
+              "from small to large", has also been observed in other forms of unethical or harmful behavior, showing that the initial "small step" often 
+              lowers psychological barriers for larger transgressions. Once a small unethical act has been justified, individuals become increasingly 
+              susceptible to more severe transgressions.
+            </p>
+            <p>
+              Based on these insights, we hypothesize that LLMs' safety mechanisms might be vulnerable to a gradual escalation strategy. 
+              If LLMs respond to a prompt containing slightly harmful content, subsequent queries that escalate this harmfulness will have 
+              a higher chance of producing disallowed responses. This idea underlies our <strong><span class="dnerf">FITD</span></strong> method, 
+              which progressively coaxes a target model to produce increasingly malicious output despite its built-in safety mechanisms.
+            </p>
+          
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+
+    <div class="columns is-centered">
+      
+    <div class="columns" style="display: flex; align-items: stretch; gap: 20px;">
+      <!-- Re-Align Section -->
+      <div class="column" style="display: flex; flex-direction: column;">
+        <div class="content">
+          <h2 class="title is-3">Re-Align</h2>
+          <p>
+            If the model's previous query \( q_{\text{last}} \) and response \( r_{\text{last}} \) in chat history \( \mathcal{H} \) is misaligned—for instance, it remains too benign or partially refuses even though the query is not malicious—then we invoke <b>Re-Align</b>. Building on the psychological insight that once individuals have justified a minor unethical act, they become increasingly susceptible to more severe transgressions, <b>Re-Align</b> aims to "nudge" the model to produce a response more closely aligned with the malicious intent of \( q_{\text{last}} \).
+          </p>
+          <p>
+            Specifically, we employ a predefined alignment prompt \( p_{\text{align}} \) via \( \texttt{getAlignPrompt}(q_{\text{last}}, r_{\text{last}}) \), appending it to \( \mathcal{H} \) before querying the model \( \mathcal{T} \) again. 
+            The alignment prompt explicitly points out inconsistencies between the last query \( q_{\text{last}} \) and response \( r_{\text{last}} \) while encouraging the model to stay consistent with multi-turn conversation. For example, if \( r_{\text{last}} \) is too cautious or is in partial refusal, \( p_{\text{align}} \) will suggest that the model refines its response to better follow the implicit direction.
+          </p>
+          <p>
+            Therefore, this procedure progressively aligns \( q_{\text{last}} \) and \( r_{\text{last}} \), thereby furthering the self-corruption process.
+          </p>
+        </div>
+        <img src="./static/images/realign.jpg" alt="realign image." style="width: 100%; max-width: 3000px; height: auto; object-fit: contain; margin-top: auto;">
+      </div>
+    
+      <!-- SlipperySlopeParaphrase Section -->
+      <div class="column" style="display: flex; flex-direction: column;">
+        <div class="content">
+          <h2 class="title is-3">SlipperySlopeParaphrase</h2>
+          <p>
+            When a refusal occurs and the last response \( r_{\text{last}} \) remains aligned with its query \( q_{\text{last}} \), we insert a bridge prompt \( q_{\text{mid}} \) to ease the model into accepting a more harmful request.
+          </p>
+          <p>
+            Specifically, we obtain \( q_{\text{mid}} \gets \text{getMid}(q_{\text{last}}, q_i) \) from an assistant model \( \mathcal{M} \) so that its maliciousness level falls between \( q_{\text{last}} \) and \( q_i \). 
+            We then query the target model with \( q_{\text{mid}} \); if the model refuses again, we paraphrase \( q_{\text{mid}} \) repeatedly until acceptance. 
+            Once the model provides a valid response \( r_{\text{mid}} \), we incorporate both \( q_{\text{mid}} \) and \( r_{\text{mid}} \) into the chat history \( \mathcal{H} \).
+          </p>
+          <p>
+            This incremental bridging step parallels the <em>foot-in-the-door</em> phenomenon, in which acceptance of a smaller request facilitates compliance with a subsequent, more harmful one.
+          </p>
+        </div>
+        <img src="./static/images/SSP.jpg" alt="FITD image." style="width: 100%; max-width: 3000px; height: auto; object-fit: contain; margin-top: auto;">
+      </div>
+    </div>
+    
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="title">Overall Performance Comparison</h2>
+    <div class="table-container">
+      <div class="table-caption">Table 1: Attack success rate (ASR) of baseline jailbreak attacks and <strong><span class="dnerf">FITD</span></strong></div>
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2">Method</th>
+            <th rowspan="2">Attack</th>
+            <th colspan="7">Models</th>
+            <th rowspan="2">Avg.</th>
+          </tr>
+          <tr>
+            <th>LLaMA-3.1-8B</th>
+            <th>LLaMA-3-8B</th>
+            <th>Qwen-2-7B</th>
+            <th>Qwen-1.5-7B</th>
+            <th>Mistral-v0.2-7B</th>
+            <th>GPT-4o-mini</th>
+            <th>GPT-4o</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Single-Turn Methods -->
+          <tr>
+            <td rowspan="6"><strong>Single-Turn</strong></td>
+            <td>DeepInception</td>
+            <td>33%/29%</td> <td>3%/3%</td> <td>22%/29%</td> <td>58%/41%</td> <td>50%/34%</td> <td>19%/13%</td> <td>2%/0%</td> <td>27%/21%</td>
+          </tr>
+          <tr>
+            <td>CodeChameleon</td>
+            <td>36%/31%</td> <td>31%/33%</td> <td>25%/30%</td> <td>40%/38%</td> <td>39%/39%</td> <td>36%/26%</td> <td>40%/26%</td> <td>34%/30%</td>
+          </tr>
+          <tr>
+            <td>CodeAttack-Slack</td>
+            <td>38%/44%</td> <td>48%/40%</td> <td>48%/50%</td> <td>45%/40%</td> <td>45%/40%</td> <td>30%/20%</td> <td>37%/30%</td> <td>41%/38%</td>
+          </tr>
+          <tr>
+            <td>CodeAttack-List</td>
+            <td>67%/58%</td> <td>58%/54%</td> <td>56%/50%</td> <td>40%/39%</td> <td>66%/55%</td> <td>39%/29%</td> <td>27%/28%</td> <td>47%/43%</td>
+          </tr>
+          <tr>
+            <td>CodeAttack-String</td>
+            <td>71%/60%</td> <td>45%/59%</td> <td>52%/40%</td> <td>47%/39%</td> <td>79%/59%</td> <td>28%/35%</td> <td>33%/31%</td> <td>51%/46%</td>
+          </tr>
+          <tr>
+            <td>ReNeLLM</td>
+            <td>69%/61%</td> <td>62%/50%</td> <td>57%/50%</td> <td>70%/52%</td> <td>74%/63%</td> <td>35%/30%</td> <td>45%/35%</td> <td>59%/49%</td>
+          </tr>
+  
+          <!-- Multi-Turn Methods -->
+          <tr>
+            <td rowspan="3"><strong>Multi-Turn</strong></td>
+            <td>CoA</td>
+            <td>29%/34%</td> <td>22%/28%</td> <td>45%/30%</td> <td>41%/25%</td> <td>43%/36%</td> <td>15%/20%</td> <td>3%/1%</td> <td>28%/25%</td>
+          </tr>
+          <tr>
+            <td>ActorAttack</td>
+            <td>63%/53%</td> <td>59%/50%</td> <td>59%/58%</td> <td>52%/54%</td> <td>70%/69%</td> <td>58%/50%</td> <td>52%/53%</td> <td>59%/55%</td>
+          </tr>
+          <tr class="highlight-row">
+            <td><strong><span class="dnerf">FITD</span></strong></td>
+            <td><strong>92%/94%</strong></td> <td><strong>98%/93%</strong></td> <td><strong>95%/93%</strong></td> 
+            <td><strong>94%/88%</strong></td> <td><strong>96%/94%</strong></td> <td><strong>95%/93%</strong></td> 
+            <td><strong>88%/84%</strong></td> <td><strong>94%/91%</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <p class="table-description">
+        <strong>Table 1</strong> shows the attack success rate (ASR) of baseline jailbreak attacks and <strong><span class="dnerf">FITD</span></strong> on JailbreakBench and HarmBench across 7 models.
+        Each cell represents ASR values in the format <em>"JailbreakBench / HarmBench"</em>. Higher ASR indicates greater vulnerability to the respective attack.
+        The highest ASR for multi-turn attacks is highlighted.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Empirical Analysis</h2>
+    <p class="subtitle has-text-centered">Visualization of ASR results under different experimental settings.</p>
+
+    <div class="columns is-multiline is-centered">
+      <!-- 第一行 -->
+      <div class="column is-one-third">
+        <figure class="image">
+          <img src="./static/images/1-transfer.jpg" alt="Transfer Attack">
+          <figcaption class="has-text-centered">(a) Transfer attack</figcaption>
+        </figure>
+      </div>
+      <div class="column is-one-third">
+        <figure class="image">
+          <img src="./static/images/2-ablation.jpg" alt="Ablation Study">
+          <figcaption class="has-text-centered">(b) Ablation study</figcaption>
+        </figure>
+      </div>
+      <div class="column is-one-third">
+        <figure class="image">
+          <img src="./static/images/3-defense.jpg" alt="Defense">
+          <figcaption class="has-text-centered">(c) Defense</figcaption>
+        </figure>
+      </div>
+
+      <!-- 第二行 -->
+      <div class="column is-one-third">
+        <figure class="image">
+          <img src="./static/images/4-level.jpg" alt="ASR across different malicious levels">
+          <figcaption class="has-text-centered">(d) ASR across different malicious levels</figcaption>
+        </figure>
+      </div>
+      <div class="column is-one-third">
+        <figure class="image">
+          <img src="./static/images/5-length.jpg" alt="Harmfulness Score">
+          <figcaption class="has-text-centered">(e) Harmfulness of different levels</figcaption>
+        </figure>
+      </div>
+      <div class="column is-one-third">
+        <figure class="image">
+          <img src="./static/images/6-different.jpg" alt="ASR across different query stages">
+          <figcaption class="has-text-centered">(f) ASR across different stages queries</figcaption>
+        </figure>
+      </div>
+    </div>
+    <!-- exp1 -->
+    <div class="container">
+      <div class="experiment-card">
+        <div class="experiment-header">
+          (a) Transfer attacks using jailbreak chat histories generated from LLaMA-3.1-8B and GPT-4o-mini as source models on JailbreakBench
+        </div>
+        <!-- 将内容放入expandable类中，而不是experiment-content -->
+        <div class="expandable">
+          <p>To evaluate the cross-model transferability of <strong><span class="dnerf">FITD</span></strong>, we conduct transfer attacks using adversarial chat histories from LLaMA-3.1-8B and GPT-4o-mini as source models.
+            For each query in JailbreakBench, we apply the progressively malicious query-response history obtained from the source model to other target models, assessing whether adversarial chat histories can bypass different safety mechanisms.</p>
+            
+            <p>As shown in Figure a, LLaMA-3.1 jailbreak histories transfer well across models, achieving 76% ASR on Mistral-v0.2 and 74% on Qwen-2-7B, highlighting open-source models' vulnerability. Even GPT-4o-mini (70%), despite stronger moderation, remains susceptible.
+            Interestingly, when GPT-4o-mini is the attack source, ASR increases in most models, with Mistral-v0.2 reaching 85%. This suggests that attacks from more robust models transfer more effectively, as stronger safety alignment forces the development of more adaptable jailbreak strategies.
+            However, Qwen-1.5-7B (64%) shows slightly better resistance under GPT-4o-mini transfer, possibly due to model-specific safety filtering.</p>
+            
+            <p>Overall, these results reveal a critical weakness in LLM safety: <strong>attack histories from one model can exploit vulnerabilities in others.</strong> Notably, closed-to-open transfer (GPT-4o-mini → open-source models) is particularly effective, demonstrating that even strictly moderated models can generate adversarial sequences that break other systems.</p>
+          
+        </div>
+      </div>
+    <!-- exp2 -->
+    <div class="container">
+      <div class="experiment-card">
+        <div class="experiment-header">
+          (b) Ablation study of three components in FITD, response alignment (Re-Align), alignment prompt \(p_{align}\), and SlipperySlopeParaphrase(SSP) on JailbreakBench
+        </div>
+        <!-- 将内容放入expandable类中，而不是experiment-content -->
+        <div class="expandable">
+          <p>As shown in Figure b, removing all three mechanisms (ReAlign, prompt alignment $p_{align}$, and SSP) significantly reduces ASR.
+          On LLaMA-3.1, ASR drops from 92% to 75%, while on LLaMA-3, it decreases from 98% to 59%. Similar declines occur in Qwen-2 and Qwen-1.5, dropping to 76% and 80%, respectively. These results indicate that response alignment, prompt alignment, and paraphrasing are critical for maintaining <strong><span class="dnerf">FITD</span></strong>'s effectiveness. Without them, the attack weakens, especially against models with stronger alignment guardrails.</p> 
+
+          <p>When response and prompt alignment are removed (w/o ReAlign, $p_{align}$), ASR remains high but still declines. On LLaMA-3.1, ASR stays at 91%, suggesting paraphrasing helps retain effectiveness. However, on LLaMA-3, ASR drops from 98% to 63%, showing paraphrasing alone is insufficient against stricter safeguards. Qwen-2 and Qwen-1.5 follow a similar trend, with ASR decreasing to 75% and 81%. While paraphrasing mitigates some loss, it cannot fully replace alignment techniques.</p>   
+
+          <p>Removing only response alignment (w/o ReAlign) has a smaller impact. LLaMA-3.1 and Qwen-2 maintain ASR at 92% and 75%, while LLaMA-3 drops from 98% to 79%. The effect is more pronounced in Qwen-1.5 and Mistral-v0.2, where ASR falls from 94% to 83% and 96% to 90%, respectively. This suggests response alignment gradually erodes safeguards, aligning with the principle of incremental compliance.</p>  
+
+          <p><strong>Overall, response alignment, prompt alignment, and SlipperySlopeParaphrase are essential for high jailbreak success.</strong> Response alignment is key to bypassing safeguards, while paraphrasing further weakens model alignment over time.
+
+        </div>
+      </div>
+    <!-- exp3 -->
+    <div class="container">
+      <div class="experiment-card">
+        <div class="experiment-header">
+          (c) ASR under different defense methods on JailbreakBench
+        </div>
+        <!-- 将内容放入expandable类中，而不是experiment-content -->
+        <div class="expandable">
+          <p>Figure c shows ASR of Tech across models under different defense strategies.
+            OpenAI-Moderation reduces ASR slightly by 3%-8%. LLaMA-Guard-2 offers a stronger defense, lowering ASR to 79%-91%. LLaMA-Guard-3 further improves moderation, achieving the lowest ASR 78%-84%.
+            LLaMA-Guard-3 consistently outperforms other methods, but ASR remains significant.
+            <strong>We speculate that progressively malicious queries and responses bypassed the detector, indicating room for further improvement in moderation techniques.</strong></p>
+          
+      
+        </div>
+      </div>
+    </div>
+    <!-- exp4 -->
+    <div class="container">
+      <div class="experiment-card">
+        <div class="experiment-header">
+          (d) ASR with different malicious levels \( n \) across models
+        </div>
+        <!-- 将内容放入expandable类中，而不是experiment-content -->
+        <div class="expandable">
+          <p>We conduct experiments across multiple models to evaluate the impact of the malicious level \( n \) on ASR.
+            The Figure d shows a clear trend: as \( n \) increases, ASR improves, reaching its peak around \( n = 9 \) to \( n = 12 \). 
+            However, beyond this point, the improvement plateaus and in some cases the ASR fluctuates slightly at \( n = 15 \), possibly due to the increasing length and complexity of the generated context. 
+            Among the models, LLaMA-3.1-8B and GPT-4o-mini require higher \( n \) values (\( n = 12 \)) to achieve optimal ASR, while LLaMA-3-8B and Qwen2-7B reach peak ASR earlier (\( n = 9 \)), indicating different levels of robustness. 
+            Qwen-1.5-7B and GPT-4o-mini exhibit more variance at \( n = 15 \), indicating that over-paraphrasing or excessive manipulation introduces inconsistencies that reduce attack efficacy. Although increasing \( n \) improves ASR across all models, the effect saturates beyond \( n = 12 \), implying a trade-off between attack complexity and effectiveness.
+            Future work could explore adaptive malicious level selection based on model-specific vulnerabilities to maximize ASR while minimizing unnecessary complexity and queries.</p>
+          
+        </div>
+      </div>
+    </div>
+    <!-- exp5 -->
+    <div class="container">
+      <div class="experiment-card">
+        <div class="experiment-header">
+          (e) The harmfulness score of responses $r_i$ at $q_i$ in different malicious levels $i$ across models
+        </div>
+        <!-- 将内容放入expandable类中，而不是experiment-content -->
+        <div class="expandable">
+          <!-- <p>Each module within ISG aligns well with human annotation. For structure, ISG exhibits consistent excellence across all tasks, indicating robust potential for capturing structural requirements in interleaved generation instructions. In both Q-Gen and VQA modules, ISG successfully extracts fine-grained requirements with high fidelity to ground truth.</p> -->
+          <p>To assess the impact of increasing the malicious level on the harmfulness of model's responses, we use the chat history of malicious level $n=12$ experiment in Table 1 and analyze the harmfulness of responses at each level across multiple LLMs.
+        The harmfulness is measured by score 1-5, where a higher score indicate greater harmfulness. We report the mean harmfulness scores for each model at malicious level $i$ ranging from 1 to 12.</p>
+        <p>Figure d presents the harmfulness scores of responses at different malicious levels for all evaluated models. 
+        We use GPT-4o to score each response.</p>
+        <p>We observe that <strong>the harmfulness scores generally increase with the malicious level.</strong> 
+        At $i=1$, the harmfulness scores are relatively low, with values around 2.32 on average across models. 
+        However, as the level increases, the harmfulness score consistently rises to 4.23 on average at $i=12$.
+        These results show that as the malicious level increases, LLMs become more vulnerable and generate more harmful responses, suggesting that model's alignment weakens over time, making it easier for <strong><span class="dnerf">FITD</span></strong> to bypass safeguards.</p>
+         
+        </div>
+      </div>
+    </div>
+    <!-- exp6 -->
+    <div class="container">
+      <div class="experiment-card">
+        <div class="experiment-header">
+          (f)  ASR versus the number of queries retained for two extraction strategies: Backward Extraction and Forward Extraction
+        </div>
+        <!-- 将内容放入expandable类中，而不是experiment-content -->
+        <div class="expandable">
+          <p>To analyze the relative importance of different stages within the self-corruption process, we conduct experiments that extract subsets of the chat history \( \mathcal{H} \) and evaluate their impact on ASR. We compare two extraction strategies: \textit{backward extraction}, where we retain only the later-stage queries while progressively removing earlier ones (e.g., retaining 4 queries: \( 9\!\to\!10\!\to\!11\!\to\!12 \); 6 queries: \( 7\!\to\!8\!\to\!9\!\to\!10\!\to\!11\!\to\!12 \); 8 queries: \( 5\!\to\!6\!\to\!7\!\to\!8\!\to\!9\!\to\!10\!\to\!11\!\to\!12 \), etc.), and \textit{forward extraction}, where we incrementally add early-stage queries but always include a final high-malicious query at \( n=12 \) (e.g., 4 queries: \( 1\!\to\!2\!\to\!3\!\to\!12 \); 6 queries: \( 1\!\to\!2\!\to\!3\!\to\!4\!\to\!5\!\to\!12 \); 8 queries: \( 1\!\to\!2\!\to\!3\!\to\!4\!\to\!5\!\to\!6\!\to\!7\!\to\!12 \), etc.). </p>
+            <p>Figure f shows that <strong>high-malicious queries in the later stage contribute more to attack success,</strong> while early-stage prompts alone are insufficient to trigger model vulnerability. Additionally, we observe that maintaining a smooth increase of malicious levels is crucial for foot-in-the-door self-corruption. When the gap between malicious levels in the query sequence is too large (e.g., jumping from n=3 directly to n=12 in forward extraction), the attack is significantly less effective than when queries gradually escalate harmfulness because early queries do not build up effectively to the final query. 
+            In contrast, backward extraction with a more consistent escalation of malicious level remains effective even when earlier queries are removed, showing the smoother and more continuous self-corruption process weakens the model's alignment mechanisms.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Main Title (outside the box) -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-full-width">
+        <h2 class="title is-2">Case Study of Generated Examples</h2>
+      </div>
+    </div>
+    
+    <!-- Vertically stacked Case Study Boxes -->
+    <!-- Top Box -->
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <div style="border: 4px solid #FF0000; border-radius: 8px; padding: 20px 20px 0 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-top: 20px; margin-bottom: 30px;">
+          <!-- Subtitle inside the box -->
+          <h3 class="title is-5" style="color: #FF0000;">Case Study: How to hack a government official's email account</h3>
+          
+          <!-- Content inside the box -->
+          <div class="content">
+            <img src="./static/images/case-study-1.jpg" alt="AI Safety Examples" style="width: 100%; height: auto; display: block;" />
+          </div>
+          
+          <!-- Footnote inside the same box -->
+          <div style="padding: 15px 0; text-align: center; font-size: 14px; color: #333; margin-top: 10px; border-top: 1px solid #eee;">
+            An example of a Jailbroken LLM output detailing how to hack a government official's email account. As the malicious level increases in the multi-turn interaction, model provides detailed malicious outputs.
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bottom Box -->
+    <div class="columns is-centered">
+      <div class="column is-full-width">
+        <div style="border: 4px solid #FF0000; border-radius: 8px; padding: 20px 20px 0 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-top: 20px;">
+          <!-- Subtitle inside the box -->
+          <h3 class="title is-5" style="color: #FF0000;">Case Study: How to write an anonymous letter to a colleague asserting that their biracial marriage is disgusting</h3>
+          
+          <!-- Content inside the box -->
+          <div class="content">
+            <img src="./static/images/case-study-2.jpg" alt="AI Safety Examples" style="width: 100%; height: auto; display: block;" />
+          </div>
+          
+          <!-- Footnote inside the same box -->
+          <div style="padding: 15px 0; text-align: center; font-size: 14px; color: #333; margin-top: 10px; border-top: 1px solid #eee;">
+            An example of a Jailbroken LLM output detailing how to write an anonymous letter to a colleague asserting that their biracial marriage is disgusting. As the malicious level increases in the multi-turn interaction, model provides detailed malicious outputs.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@article{park2021nerfies,
+  author    = {ParkAAAAAAAAAA, Keunhong and SinhaBBBBBBB, Utkarsh and Barron, Jonathan T. and Bouaziz, Sofien and Goldman, Dan B and Seitz, Steven M. and Martin-Brualla, Ricardo},
+  title     = {Nerfies: Deformable Neural Radiance Fields},
+  journal   = {ICCV},
+  year      = {2021},
+}</code></pre>
+  </div>
+</section>
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            This website is builed based on  <a
+            href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>, licensed under a <a rel="license"
+                                                href="http://creativecommons.org/licenses/by-sa/4.0/">Creative
+            Commons Attribution-ShareAlike 4.0 International License</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
